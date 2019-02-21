@@ -233,6 +233,42 @@ The file aws-lambda-tools-defaults.json defines default values for paramters, am
     "template-parameters" : "\"ShouldCreateBucket\"=\"true\";\"BucketName\"=\"devweek-2019-download\";\"MemorySize\"=\"512\"",
 ```
 
+## Offloading Long-Running Tasks ##
+
+This project includes an example of offloading long-running work to a second lambda.
+
+In the QueueController, the PostMessage endpoint will put a message on the configured queue. The queue is configured by the serverless.template when the API is deployed. (You will need to enter your own SQS url in appsettings.Private.json.)
+
+```csharp
+	[HttpPost]
+	public async Task<IActionResult> PostMessage([FromBody] QueueRequest message)
+	{
+		var request = new SendMessageRequest
+		{
+			MessageBody = message.Message,
+			QueueUrl = _queueUrl
+		};
+
+		await _sqsClient.SendMessageAsync(request);
+
+		return Ok($"Message '{message.Message}' from user {message.User} queued.");
+	}
+```
+Deploy DevWeek2019LambdaWorker, and configure it with an SQS trigger on the created queue from the Lambda console.
+
+When a message is posted to the queue, it logs a message to CloudWatch to simulate work.
+
+```csharp
+    private async Task ProcessMessageAsync(SQSEvent.SQSMessage message, ILambdaContext context)
+    {
+        context.Logger.LogLine($"Processed message {message.Body}");
+
+        // TODO: Do interesting work based on the new message
+        await Task.CompletedTask;
+    }
+```
+
+
 ## More Information ##
 
 I highly recommend looking that the [GitHub for AWS Lambda](https://github.com/aws/aws-lambda-dotnet), it provides extensive information.
