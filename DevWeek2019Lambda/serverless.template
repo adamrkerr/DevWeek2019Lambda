@@ -67,8 +67,8 @@
 				"CorsRules" : [ 
 					{
 					  "AllowedHeaders" : [ "*" ],
-					  "AllowedMethods" : [ "GET","OPTIONS" ],
-					  "AllowedOrigins" : [ "*" ]
+					  "AllowedOrigins" : [ "*" ],
+					  "AllowedMethods" : [ "GET" ]
 					}
 				]
 			}
