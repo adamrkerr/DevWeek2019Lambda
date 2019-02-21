@@ -1,65 +1,238 @@
-# ASP.NET Core Web API Serverless Application
+# DeveloperWeek 2019 - AWS Lambda with C# #
 
-This project shows how to run an ASP.NET Core Web API project as an AWS Lambda exposed through Amazon API Gateway. The NuGet package [Amazon.Lambda.AspNetCoreServer](https://www.nuget.org/packages/Amazon.Lambda.AspNetCoreServer) contains a Lambda function that is used to translate requests from API Gateway into the ASP.NET Core framework and then the responses from ASP.NET Core back to API Gateway.
-
-The project starts with two Web API controllers. The first is the example ValuesController that is created by default for new ASP.NET Core Web API projects. The second is S3ProxyController which uses the AWS SDK for .NET to proxy requests for an Amazon S3 bucket.
+This project demostrates concepts covered in my presentation at DevWeek 2019 in Oakland, California.
 
 
-### Configuring AWS SDK for .NET ###
+## Binary Content ##
 
-To integrate the AWS SDK for .NET with the dependency injection system built into ASP.NET Core the NuGet package [AWSSDK.Extensions.NETCore.Setup](https://www.nuget.org/packages/AWSSDK.Extensions.NETCore.Setup/) is referenced. In the Startup.cs file the Amazon S3 client is added to the dependency injection framework. The S3ProxyController will get its S3 service client from there.
+To allow Lambda to server binary content, you need to specify the content types in LambdaEntryPoint.cs, along with configuring the API Gateway
 
 ```csharp
-public void ConfigureServices(IServiceCollection services)
-{
-    services.AddMvc();
+    protected override void Init(IWebHostBuilder builder)
+    {
+        builder
+            .UseStartup<Startup>();
 
-    // Add S3 to the ASP.NET Core dependency injection framework.
-    services.AddAWSService<Amazon.S3.IAmazonS3>();
-}
+        this.RegisterResponseContentEncodingForContentType("application/vnd.ms-excel",
+            ResponseContentEncoding.Base64);
+    }
 ```
 
-### Project Files ###
+To test this, use the FileController's "sample" route. The file returned will be encoded as a base64 string.
 
-* serverless.template - an AWS CloudFormation Serverless Application Model template file for declaring your Serverless functions and other AWS resources
-* aws-lambda-tools-defaults.json - default argument settings for use with Visual Studio and command line deployment tools for AWS
-* LambdaEntryPoint.cs - class that derives from **Amazon.Lambda.AspNetCoreServer.APIGatewayProxyFunction**. The code in this file bootstraps the ASP.NET Core hosting framework. The Lambda function is defined in the base class.
-* LocalEntryPoint.cs - for local development this contains the executable Main function which bootstraps the ASP.NET Core hosting framework with Kestrel, as for typical ASP.NET Core applications.
-* Startup.cs - usual ASP.NET Core Startup class used to configure the services ASP.NET Core will use.
-* web.config - used for local development.
-* Controllers\S3ProxyController - Web API controller for proxying an S3 bucket
-* Controllers\ValuesController - example Web API controller
+## S3 Secure URLs ##
 
-You may also have a test project depending on the options selected.
+Sometimes, it is better to have Lambda return a secure URL to a file in an S3 bucket.
 
-## Here are some steps to follow from Visual Studio:
+```csharp
+    var linkRequest = new GetPreSignedUrlRequest()
+    {
+        BucketName = _s3Bucket,
+        Key = s3File,
+        Expires = DateTime.UtcNow.AddMinutes(1)
+    };
 
-To deploy your Serverless application, right click the project in Solution Explorer and select *Publish to AWS Lambda*.
-
-To view your deployed application open the Stack View window by double-clicking the stack name shown beneath the AWS CloudFormation node in the AWS Explorer tree. The Stack View also displays the root URL to your published application.
-
-## Here are some steps to follow to get started from the command line:
-
-Once you have edited your template and code you can deploy your application using the [Amazon.Lambda.Tools Global Tool](https://github.com/aws/aws-extensions-for-dotnet-cli#aws-lambda-amazonlambdatools) from the command line.
-
-Install Amazon.Lambda.Tools Global Tools if not already installed.
-```
-    dotnet tool install -g Amazon.Lambda.Tools
+    var response = _s3Client.GetPreSignedURL(linkRequest);
 ```
 
-If already installed check if new version is available.
-```
-    dotnet tool update -g Amazon.Lambda.Tools
+Private buckets which allow file downloads over secure links must have CORS configured. The serverless.template of this project creates a bucket and does some initial setup.
+
+```json
+    "Bucket" : {
+        "Type" : "AWS::S3::Bucket",
+        "Condition" : "CreateS3Bucket",
+        "Properties" : {
+            "BucketName" : { "Fn::If" : ["BucketNameGenerated", {"Ref" : "AWS::NoValue" }, { "Ref" : "BucketName" } ] },
+            "CorsConfiguration" : {
+				"CorsRules" : [ 
+					{
+					  "AllowedHeaders" : [ "*" ],
+					  "AllowedMethods" : [ "GET","OPTIONS" ],
+					  "AllowedOrigins" : [ "*" ]
+					}
+				]
+			}
+        }
+    }
 ```
 
-Execute unit tests
-```
-    cd "DevWeek2019Lambda/test/DevWeek2019Lambda.Tests"
-    dotnet test
+To test this, use the FileController's "link" route. The URL returned should be able to download the file, but you must configure your bucket correctly.
+
+## Logging ##
+
+The LoggingController represents several different methods of logging.
+
+### API Gateway Logging ###
+
+If your API Gateway is configured for logging, as the presentation demostrates, the below endpoint will overflow the response buffer, causing the API Gateway to log an error in CloudWatch.
+
+```csharp
+    [HttpGet("flood")]
+    public string Flood()
+    {
+        var builder = new StringBuilder();
+
+        //1024 bytes * 1024 kb * 8 mb should overflow lambda
+        for(int i = 0; i < (1024 * 1024 * 8); i++)
+        {
+            builder.Append("A");
+        }
+
+        return builder.ToString();
+    }
 ```
 
-Deploy application
+### Console Logging ###
+
+All console messages will be written to the Lambda's default Cloudwatch Stream.
+
+```csharp
+    [HttpGet("console/{msg}")]
+    public IActionResult GetConsole(string msg)
+    {
+        Console.WriteLine($"CONSOLE: {msg}");
+
+        return Ok($"Message logged to console: {msg}");
+    }
 ```
-    cd "DevWeek2019Lambda/src/DevWeek2019Lambda"
-    dotnet lambda deploy-serverless
+
+### Custom Logging ###
+
+Injecting ILogger is preferrable to writing to the console. The following example shows how to use the CloudWatch SDK to log to a custom stream.
+
+In appsettings.json:
+```json
+  "AWS.Logging": {
+    "Region": "us-east-1",
+    "LogGroup": "DevWeek2019Lambda",
+    "MaxQueuedMessages": 1,
+    "LogLevel": {
+      "Default": "Warning",
+      "System": "Warning",
+      "Microsoft": "Warning"
+    }
+  },
 ```
+In Startup.cs
+```csharp
+    public Startup(IConfiguration rootConfiguration, IHostingEnvironment env)
+    {
+        // Read the appsetting.json file for the configuration details
+        var builder = new ConfigurationBuilder()
+            .AddConfiguration(rootConfiguration)
+            .SetBasePath(env.ContentRootPath)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
+            .AddEnvironmentVariables();
+
+        Configuration = builder.Build();
+    }
+
+    public static IConfiguration Configuration { get; private set; }
+
+    // This method gets called by the runtime. Use this method to configure the HTTP request pipeline
+    public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
+    {
+        var config = Configuration.GetAWSLoggingConfigSection();
+            
+        // Create a logging provider based on the configuration information passed through the appsettings.json
+        loggerFactory.AddAWSProvider(Configuration.GetAWSLoggingConfigSection());
+    }
+```
+
+Finally, in the LoggingController:
+```csharp
+    private readonly ILogger<LoggingController> _logger;
+
+    public LoggingController(ILogger<LoggingController> logger) {
+        this._logger = logger;
+    }
+
+    [HttpGet("custom/{msg}")]
+    public IActionResult GetCustom(string msg)
+    {
+        //Messages may take a while to appear in this log
+        _logger.LogCritical("LOGGER: {0}", msg);
+
+        return Ok($"Message logged to cloudwatch: {msg}");
+    }
+```
+## Environment Variables ##
+
+The EnvironmentController demonstrates how Lambda reads environment variables.
+
+In the base appsettings.json, the variable EnvironmentOverride is configured. This is the default value.
+```json
+  "EnvironmentOverride": "default"
+```
+
+In the appsettings.Development.json, there is a override that is used when the environment variable "ASPNETCORE_Environment" is set to "Development"
+```json
+  "EnvironmentOverride": "development"
+```
+
+The "ASPNETCORE_Environment" variable is set by the serverless template:
+```json
+    "AspNetCoreFunction" : {
+      "Type" : "AWS::Serverless::Function",
+      "Properties": {
+        "Environment" : {
+          "Variables" : {
+            "AppS3Bucket" : { "Fn::If" : ["CreateS3Bucket", {"Ref":"Bucket"}, { "Ref" : "BucketName" } ] },
+			"ASPNETCORE_Environment" : "Development"
+          }
+        },
+```
+
+Finally, this value can be changed at runtime by adding "EnvironmentOverride" as an environment variable in the Lambda console.
+The current value will be returned by the EnvironmentController
+```csharp
+    // GET api/override
+    [HttpGet("override")]
+    public IActionResult Get()
+    {            
+        return Ok(_config.GetValue<string>("EnvironmentOverride"));
+    }
+```
+
+## Serverless Templates ##
+
+The serverless.template defines how your function is created and deployed, along with any resources created for it.
+
+### Variables ###
+
+The serverless template defines a parameter for the function's memory allocation.
+```json
+  "Parameters" : {
+	"MemorySize" : {
+		"Type": "Number",
+		"Description" : "The amount of memory to allocate to this lamdba function",
+		"Default" : "128",
+		"MaxValue": "3008",
+		"MinValue": "128"
+	}
+  },
+```
+
+It then uses the value of this parameter when configuring the function.
+```json
+"AspNetCoreFunction" : {
+      "Type" : "AWS::Serverless::Function",
+      "Properties": {
+        "Handler": "DevWeek2019Lambda::DevWeek2019Lambda.LambdaEntryPoint::FunctionHandlerAsync",
+        "MemorySize": {"Ref" : "MemorySize"},
+      }
+    },
+```
+
+### Defaults ###
+
+The file aws-lambda-tools-defaults.json defines default values for paramters, among other things.
+```json
+    "template-parameters" : "\"ShouldCreateBucket\"=\"true\";\"BucketName\"=\"devweek-2019-download\";\"MemorySize\"=\"512\"",
+```
+
+## More Information ##
+
+I highly recommend looking that the [GitHub for AWS Lambda](https://github.com/aws/aws-lambda-dotnet), it provides extensive information.
+

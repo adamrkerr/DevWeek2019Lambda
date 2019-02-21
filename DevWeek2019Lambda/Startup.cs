@@ -15,9 +15,17 @@ namespace DevWeek2019Lambda
     {
         public const string AppS3BucketKey = "AppS3Bucket";
 
-        public Startup(IConfiguration configuration)
+        public Startup(IConfiguration rootConfiguration, IHostingEnvironment env)
         {
-            Configuration = configuration;
+            // Read the appsetting.json file for the configuration details
+            var builder = new ConfigurationBuilder()
+                .AddConfiguration(rootConfiguration)
+                .SetBasePath(env.ContentRootPath)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
+                .AddEnvironmentVariables();
+
+            Configuration = builder.Build();
         }
 
         public static IConfiguration Configuration { get; private set; }
@@ -32,7 +40,7 @@ namespace DevWeek2019Lambda
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
         {
             if (env.IsDevelopment())
             {
@@ -42,6 +50,11 @@ namespace DevWeek2019Lambda
             {
                 app.UseHsts();
             }
+
+            var config = Configuration.GetAWSLoggingConfigSection();
+            
+            // Create a logging provider based on the configuration information passed through the appsettings.json
+            loggerFactory.AddAWSProvider(Configuration.GetAWSLoggingConfigSection());
 
             app.UseHttpsRedirection();
             app.UseMvc();

@@ -5,6 +5,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using System.IO;
+using Amazon.Lambda.AspNetCoreServer;
 
 namespace DevWeek2019Lambda
 {
@@ -25,6 +26,9 @@ namespace DevWeek2019Lambda
         {
             builder
                 .UseStartup<Startup>();
+
+            this.RegisterResponseContentEncodingForContentType("application/vnd.ms-excel",
+                ResponseContentEncoding.Base64);
         }
     }
 }
