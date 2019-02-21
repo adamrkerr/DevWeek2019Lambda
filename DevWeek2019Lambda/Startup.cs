@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Amazon;
 using Amazon.S3;
+using Amazon.SQS;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -16,6 +17,7 @@ namespace DevWeek2019Lambda
     public class Startup
     {
         public const string AppS3BucketKey = "AppS3Bucket";
+        public const string AppQueueUrl = "AppQueueUrl";
 
         public Startup(IConfiguration rootConfiguration, IHostingEnvironment env)
         {
@@ -23,8 +25,9 @@ namespace DevWeek2019Lambda
             var builder = new ConfigurationBuilder()
                 .AddConfiguration(rootConfiguration)
                 .SetBasePath(env.ContentRootPath)
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
                 .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
+                .AddJsonFile($"appsettings.Private.json", optional: true) //holds things not committed to source control
                 .AddEnvironmentVariables();
 
             Configuration = builder.Build();
@@ -37,12 +40,11 @@ namespace DevWeek2019Lambda
         {
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
 
-            services.AddDefaultAWSOptions(Configuration.GetAWSOptions());
-
-            var s3Region = Configuration.GetSection("AWS.S3").GetValue<string>("Region");
-
+            var defaultOptions = Configuration.GetAWSOptions();
+            services.AddDefaultAWSOptions(defaultOptions);
+                        
             services.AddSingleton<AmazonS3Config>(new AmazonS3Config{
-                RegionEndpoint = RegionEndpoint.GetBySystemName(s3Region),
+                RegionEndpoint = defaultOptions.Region,
                 SignatureVersion = "v4"
             });
 
@@ -51,6 +53,20 @@ namespace DevWeek2019Lambda
                 var s3Config = s.GetRequiredService<AmazonS3Config>();
                 return new AmazonS3Client(s3Config);
             });
+
+            services.AddSingleton<AmazonSQSConfig>(new AmazonSQSConfig
+            {
+                RegionEndpoint = defaultOptions.Region,
+                ServiceURL = $"http://sqs.{defaultOptions.Region.SystemName}.amazonaws.com"
+            });
+
+            services.AddScoped<IAmazonSQS>(s =>
+            {
+                var sqsConfig = s.GetRequiredService<AmazonSQSConfig>();
+                return new AmazonSQSClient(sqsConfig);
+            });
+
+            services.AddSingleton<IConfiguration>(Configuration);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline

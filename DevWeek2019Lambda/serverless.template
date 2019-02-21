@@ -9,9 +9,19 @@
       "AllowedValues" : ["true", "false"],
       "Description" : "If true then the S3 bucket that will be proxied will be created with the CloudFormation stack."
     },  
+	"ShouldCreateQueue" : {
+      "Type" : "String",        
+      "AllowedValues" : ["true", "false"],
+      "Description" : "If true then the SQS that will be proxied will be created with the CloudFormation stack."
+    },  
     "BucketName" : {
         "Type" : "String",
         "Description" : "Name of S3 bucket that will be proxied. If left blank a name will be generated.",
+        "MinLength" : "0"
+    },
+    "QueueName" : {
+        "Type" : "String",
+        "Description" : "Name of SQS that will be proxied. If left blank a name will be generated.",
         "MinLength" : "0"
     },
 	"MemorySize" : {
@@ -25,7 +35,9 @@
 
   "Conditions" : {
     "CreateS3Bucket" : {"Fn::Equals" : [{"Ref" : "ShouldCreateBucket"}, "true"]},
-    "BucketNameGenerated" : {"Fn::Equals" : [{"Ref" : "BucketName"}, ""]}
+	"CreateQueue":{"Fn::Equals" : [{"Ref" : "ShouldCreateQueue"}, "true"]},
+    "BucketNameGenerated" : {"Fn::Equals" : [{"Ref" : "BucketName"}, ""]},
+	"QueueNameGenerated" : {"Fn::Equals" : [{"Ref" : "QueueName"}, ""]}
   },
 
   "Resources" : {
@@ -73,7 +85,15 @@
 				]
 			}
         }
-    }
+    },
+
+	"Queue":{
+		"Type":"AWS::SQS::Queue",
+		"Condition":"CreateQueue",
+		"Properties":{
+			"QueueName":{ "Fn::If" : ["QueueNameGenerated", {"Ref" : "AWS::NoValue" }, { "Ref" : "QueueName" } ] }
+		}
+	}
   },
 
   "Outputs" : {
@@ -83,6 +103,9 @@
     },
     "S3ProxyBucket" : {
         "Value" : { "Fn::If" : ["CreateS3Bucket", {"Ref":"Bucket"}, { "Ref" : "BucketName" } ] }
+    },
+    "ProxyQueue" : {
+        "Value" : { "Fn::If" : ["CreateQueue", {"Ref":"Queue"}, { "Ref" : "QueueName" } ] }
     }
   }
 }

@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.28307.329
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DevWeek2019Lambda", "DevWeek2019Lambda\DevWeek2019Lambda.csproj", "{06F27A4D-A244-4E59-B932-58DF6B949E41}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DevWeek2019LambdaWorker", "DevWeek2019LambdaWorker\DevWeek2019LambdaWorker.csproj", "{C4A5F37D-E6A7-42A6-B4B3-7AB570B13465}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{06F27A4D-A244-4E59-B932-58DF6B949E41}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{06F27A4D-A244-4E59-B932-58DF6B949E41}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{06F27A4D-A244-4E59-B932-58DF6B949E41}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C4A5F37D-E6A7-42A6-B4B3-7AB570B13465}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4A5F37D-E6A7-42A6-B4B3-7AB570B13465}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4A5F37D-E6A7-42A6-B4B3-7AB570B13465}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4A5F37D-E6A7-42A6-B4B3-7AB570B13465}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

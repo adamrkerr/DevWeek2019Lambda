@@ -10,9 +10,12 @@
     "region"      : "us-east-2",
     "configuration" : "Release",
     "framework"     : "netcoreapp2.1",
-    "s3-prefix"     : "DevWeek2019Lambda/",
-    "template"      : "serverless.template",
-    "template-parameters" : "\"ShouldCreateBucket\"=\"true\";\"ShouldCreateQueue\"=\"true\";\"BucketName\"=\"devweek-2019-download\";\"QueueName\"=\"devweek-2019-queue\";\"MemorySize\"=\"512\"",
-    "s3-bucket"           : "fast-deploy-test-ak",
-    "stack-name"          : "devweek2019-deploy"
+    "function-runtime" : "dotnetcore2.1",
+    "function-memory-size" : 128,
+    "function-timeout"     : 30,
+    "function-handler"     : "DevWeek2019LambdaWorker::DevWeek2019LambdaWorker.Function::FunctionHandler",
+    "function-name"        : "devweek2019-queue-worker",
+    "function-role"        : "arn:aws:iam::023617540209:role/lambda_exec_devweek2019-queue-worker",
+    "tracing-mode"         : "PassThrough",
+    "environment-variables" : ""
 }
