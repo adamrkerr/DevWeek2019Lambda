@@ -46,12 +46,12 @@ namespace DevWeek2019Lambda.Controllers
         public async Task<IActionResult> GetFileLink()
         {
             //For demo purposes, assume the file is already in the bucket
-
             var linkRequest = new GetPreSignedUrlRequest()
             {
                 BucketName = _s3Bucket,
                 Key = s3File,
-                Expires = DateTime.UtcNow.AddMinutes(1)
+                Expires = DateTime.Now.AddMinutes(1),
+                Verb = HttpVerb.GET
             };
 
             var response = _s3Client.GetPreSignedURL(linkRequest);

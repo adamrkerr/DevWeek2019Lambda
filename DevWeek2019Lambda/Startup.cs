@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Amazon;
+using Amazon.S3;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -35,8 +37,20 @@ namespace DevWeek2019Lambda
         {
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
 
+            services.AddDefaultAWSOptions(Configuration.GetAWSOptions());
+
+            var s3Region = Configuration.GetSection("AWS.S3").GetValue<string>("Region");
+
+            services.AddSingleton<AmazonS3Config>(new AmazonS3Config{
+                RegionEndpoint = RegionEndpoint.GetBySystemName(s3Region),
+                SignatureVersion = "v4"
+            });
+
             // Add S3 to the ASP.NET Core dependency injection framework.
-            services.AddAWSService<Amazon.S3.IAmazonS3>();
+            services.AddScoped<Amazon.S3.IAmazonS3>(s => {
+                var s3Config = s.GetRequiredService<AmazonS3Config>();
+                return new AmazonS3Client(s3Config);
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline
@@ -52,7 +66,7 @@ namespace DevWeek2019Lambda
             }
 
             var config = Configuration.GetAWSLoggingConfigSection();
-            
+                        
             // Create a logging provider based on the configuration information passed through the appsettings.json
             loggerFactory.AddAWSProvider(Configuration.GetAWSLoggingConfigSection());
 
