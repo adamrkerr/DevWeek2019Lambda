@@ -48,7 +48,7 @@ Private buckets which allow file downloads over secure links must have CORS conf
 				"CorsRules" : [ 
 					{
 					  "AllowedHeaders" : [ "*" ],
-					  "AllowedMethods" : [ "GET","OPTIONS" ],
+					  "AllowedMethods" : [ "GET" ],
 					  "AllowedOrigins" : [ "*" ]
 					}
 				]
